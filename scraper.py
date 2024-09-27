@@ -6,25 +6,14 @@ from selenium.webdriver.common import options
 from selenium.webdriver.safari.webdriver import WebDriver as SafariWebDriver
 from selenium.webdriver.firefox.webdriver import WebDriver as FirefoxWebDriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.safari.options import Options as SafariOptions
+from settings import *
 
+WebDriver = ChromeWebDriver, SafariWebDriver, FirefoxWebDriver
 import sqlite3
 import bs4
 import polars as pl
 import time
 
-WebDriver = ChromeWebDriver | SafariWebDriver | FirefoxWebDriver
-Options = ChromeOptions | SafariOptions | FirefoxOptions
-DEFAULT_WEB_DRIVER = "firefox"
-
-DEFAULT_WEB_DRIVER_OPTIONS = FirefoxOptions()
-
-SECONDS_BETWEEN_REQUESTS = 10
-MENU_URL = "https://www.ultimate-guitar.com/explore?order=hitstotal_desc&type%5B%5D=Tabs"
-DEFAULT_LINK_DATABASE = "source/links2.db"
-LAST_LINK = "logs/last_link.txt"
 def build_db(link_database: str = DEFAULT_LINK_DATABASE) -> None:
     with sqlite3.connect(link_database) as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS links (id INTEGER PRIMARY KEY, link TEXT UNIQUE )")
@@ -36,8 +25,7 @@ def save_links(links: list[str], link_database: str = DEFAULT_LINK_DATABASE):
             try:
                 conn.execute("INSERT INTO links(link) VALUES (?)", (link,))
             except sqlite3.IntegrityError as e:
-                ic(e)
-                ic("link already exists")
+                ic(e,link)
 
         conn.commit()
 
@@ -84,16 +72,10 @@ def scrape_raw_tab_menu(web_driver: WebDriver, save: bool) -> tuple[WebDriver, l
     return web_driver, tab_links, source
 
 def next_page(web_driver: WebDriver) -> WebDriver:
-    # Is it inefficient? Yes. idrc tbh tho.
-    soup = bs4.BeautifulSoup(web_driver.page_source, "html.parser")
-    anchors = soup.find_all('a')
-    anchor = [a for a in anchors if ("next >" in a.contents)][0]
-    element = web_driver.find_element(By.XPATH, f"//a[@href='{anchor['href']}']")
+    elems = web_driver.find_elements(By.XPATH, "//a")
+    next_button = [a for a in elems if "NEXT >" in a.text][0]
+    next_button.click()
 
-    if element is not None:
-        element.click()
-
-    ic(len(anchors))
     time.sleep(SECONDS_BETWEEN_REQUESTS)
     return web_driver
 
@@ -120,12 +102,14 @@ def scrape_raw_tab(url: str, driver: str = DEFAULT_WEB_DRIVER) -> str:
 
 if __name__ == "__main__":
     counter = 0
-    with open(LAST_LINK,'r') as file:
-        last_link = file.read()
-
+    if USE_LAST_LINK:
+        with open(LAST_LINK_PATH,'r') as file:
+            last_link = file.read()
+        wd = create_webdriver(url = last_link)
+    else:
+        wd = create_webdriver(url = MENU_URL)
     build_db()
 
-    wd = create_webdriver(url = MENU_URL)
     try:
         while True:
 
@@ -139,15 +123,20 @@ if __name__ == "__main__":
                         break
 
                     except Exception as e:
-                        print(e)
+                        ic(e)
                         print("deleting cookies")
                         wd.delete_all_cookies()
                         with open(f"logs/err.txt",'w') as file:
                             file.write(wd.page_source)
                         time.sleep(1)
 
-                with open(LAST_LINK,'w') as file:
-                    file.write(wd.current_url)
+                try:
+                    with open(LAST_LINK_PATH,'w') as file:
+                        file.write(wd.current_url)
+                except:
+                    pass
+
+                counter += 1
                 print(counter)
             print("sleeping...")
             time.sleep(4)
