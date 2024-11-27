@@ -7,9 +7,7 @@ from settings import *
 
 import sqlite3
 import bs4
-import polars as pl
 import time
-
 def build_db(link_database: str = DEFAULT_LINK_DATABASE) -> None:
     with sqlite3.connect(link_database) as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS links (id INTEGER PRIMARY KEY, link TEXT UNIQUE )")
@@ -25,21 +23,19 @@ def save_links(links: list[str], link_database: str = DEFAULT_LINK_DATABASE):
 
         conn.commit()
 
-def load_links(link_database: str = DEFAULT_LINK_DATABASE) -> pl.Series:
-    with sqlite3.connect(link_database) as conn:
-        df = pl.read_database("SELECT link from links",conn)
-        return df["link"]
-
 def create_webdriver(
         url: str,
+    speedyboi: bool = False,
         wait: float = SECONDS_BETWEEN_REQUESTS,
         opts: Options = DEFAULT_WEB_DRIVER_OPTIONS
 ) -> WebDriver:
     web_driver = webdriver.Chrome(options = opts)
     ic("fetching url")
     web_driver.get(url)
-    ic("starting wait")
-    web_driver.implicitly_wait(wait)
+    if speedyboi:
+        ic("starting wait")
+        web_driver.implicitly_wait(wait)
+    ic("SPEEEEEEED")
     ic("done fetching url")
     return web_driver
 
@@ -70,26 +66,26 @@ def next_page(web_driver: WebDriver) -> WebDriver:
     time.sleep(SECONDS_BETWEEN_REQUESTS)
     return web_driver
 
-def scrape_raw_tab(url: str) -> str:
+def scrape_raw_tab(url: str, speedyboi = False) -> str:
 
-    web_driver = create_webdriver(url)
+    wd = create_webdriver(url, speedyboi=speedyboi)
+    source = wd.page_source
+    wd.close()
 
-    web_driver.get(url)
-
-    source = web_driver.page_source
     name = url.split("tab/")[1]
     name = name.replace("/","_")
 
 
-    with open(f"source/{name}.html",'w') as file:
+    with open(f"tabs/{name}.html",'w') as file:
         file.write(source)
 
     # tabs = source.split(f'style="font-size: 13px; font-family: &quot;Roboto Mono&quot;, &quot;Courier New&quot;, monospace;">')[0]
     # tabs = tabs.split(f'<div')[0]
 
-    web_driver.close()
 
     return source
+
+
 
 if __name__ == "__main__":
     counter = 0
@@ -136,7 +132,3 @@ if __name__ == "__main__":
         input("press enter to close browser")
         wd.close()
         raise e 
-    # for tab_link in tab_links:
-    #     scrape_raw_tab(tab_link)
-    #     time.sleep(SECONDS_BETWEEN_REQUESTS)
-
