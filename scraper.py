@@ -1,14 +1,10 @@
-from os import link
 from selenium import webdriver
-from icecream import DEFAULT_OUTPUT_FUNCTION, ic
-from selenium.webdriver.chrome.webdriver import WebDriver as ChromeWebDriver
-from selenium.webdriver.common import options
-from selenium.webdriver.safari.webdriver import WebDriver as SafariWebDriver
-from selenium.webdriver.firefox.webdriver import WebDriver as FirefoxWebDriver
+from icecream import ic
+from selenium.webdriver.chrome.webdriver import WebDriver 
+from selenium.webdriver.chrome.options import Options 
 from selenium.webdriver.common.by import By
 from settings import *
 
-WebDriver = ChromeWebDriver, SafariWebDriver, FirefoxWebDriver
 import sqlite3
 import bs4
 import polars as pl
@@ -34,17 +30,12 @@ def load_links(link_database: str = DEFAULT_LINK_DATABASE) -> pl.Series:
         df = pl.read_database("SELECT link from links",conn)
         return df["link"]
 
-def create_webdriver(url: str, driver: str = DEFAULT_WEB_DRIVER, wait: float = SECONDS_BETWEEN_REQUESTS, opts:Options = DEFAULT_WEB_DRIVER_OPTIONS) -> WebDriver:
-    match driver:
-        case "safari":
-            web_driver = webdriver.Safari(options = opts)
-        case "chrome":
-            web_driver = webdriver.Chrome(options = opts)
-        case "firefox":
-            web_driver = webdriver.Firefox(options = opts)
-        case _:
-            raise Exception(f"invalid driver: {driver}")
-
+def create_webdriver(
+        url: str,
+        wait: float = SECONDS_BETWEEN_REQUESTS,
+        opts: Options = DEFAULT_WEB_DRIVER_OPTIONS
+) -> WebDriver:
+    web_driver = webdriver.Chrome(options = opts)
     ic("fetching url")
     web_driver.get(url)
     ic("starting wait")
@@ -79,9 +70,9 @@ def next_page(web_driver: WebDriver) -> WebDriver:
     time.sleep(SECONDS_BETWEEN_REQUESTS)
     return web_driver
 
-def scrape_raw_tab(url: str, driver: str = DEFAULT_WEB_DRIVER) -> str:
+def scrape_raw_tab(url: str) -> str:
 
-    web_driver = create_webdriver(url, driver)
+    web_driver = create_webdriver(url)
 
     web_driver.get(url)
 
